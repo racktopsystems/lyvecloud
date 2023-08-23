@@ -94,6 +94,49 @@ func NewClient(credentials *Credentials, apiUrl string) (*Client, error) {
 	}, nil
 }
 
+// NewAuthenticatedClient initializes a Lyve Cloud API client without first
+// authenticating with the API. The supplied token is assumed to be valid,
+// however the API is queried to determine the expiry of the token. If that
+// query fails, which would typically happen if the token was already expired
+// that error will be returned to the caller with a nil instead of a pointer to
+// an initialized *Client. Otherwise we will return an initialized client and a
+// nil error. This client will be usable for at least the
+func NewAuthenticatedClient(token, apiUrl string) (*Client, error) {
+	const roundTo = nsecPerSec
+
+	var err error
+	var expiresIn time.Duration
+
+	// If there is nothing passed-in for apiUrl, use default LyveCloud API URL.
+	if apiUrl == "" {
+		apiUrl = LyveCloudApiPrefix
+	}
+
+	now := time.Now()
+
+	if expiresIn, err = getTokenExpiresDuration(token, apiUrl); err != nil {
+		return nil, err
+	}
+
+	// This is imprecise for a few reasons. First, we are rounding here, and
+	// second receiving token validity from the API in seconds, which we then
+	// add to a timestamp that we took, which is hopefully close, but not
+	// guaranteed to be close to the clocks on the API side. Finally, the
+	// validity period returned by the API is low-precision, seconds as opposed
+	// to msecs, usecs, etc.
+	tokExpiresAfter := now.Add(expiresIn).Round(roundTo)
+
+	return &Client{
+		apiUrl,
+		sync.RWMutex{},
+		tokenDetails{
+			token:           token,
+			expiresAfter:    tokExpiresAfter,
+			issuedTimestamp: now,
+		},
+	}, nil
+}
+
 // Token is a string representation of the token previously returned by thr API
 // in exchange for valid account credentials.
 func (client *Client) Token() string {
@@ -127,36 +170,53 @@ func (client *Client) TokenExpired() bool {
 // the API is queried and may subsequently be adjusted due to drift, etc.
 func (client *Client) TokenValidUntil() (time.Time, error) {
 	var err error
-	var expiresInSecs int
-	var rdr io.ReadCloser
+	var expiresIn time.Duration
 
 	client.mtx.RLock()
-	endpoint := client.apiUrl + "/auth/token"
+	apiUrl := client.apiUrl
 	token := client.token
 	client.mtx.RUnlock()
 
 	now := time.Now()
 
+	if expiresIn, err = getTokenExpiresDuration(token, apiUrl); err != nil {
+		return time.Time{}, err
+	}
+
+	return now.Add(expiresIn).Round(nsecPerSec), nil
+}
+
+func getTokenExpiresDuration(token, apiUrl string) (time.Duration, error) {
+	var err error
+	var expiresInSecs int
+	var rdr io.ReadCloser
+
+	var endpoint string
+	if apiUrl != "" {
+		endpoint = apiUrl + "/auth/token"
+	} else {
+		endpoint = LyveCloudApiPrefix + "/auth/token"
+	}
+
 	if rdr, err = apiRequestAuthenticated(
 		token, http.MethodGet, endpoint, nil); err != nil {
-		return time.Time{}, err
+		return 0, err
 	}
 
 	defer rdr.Close()
 
-	tokValidResp := &Token{}
+	tok := Token{}
 	respBodyDecoder := json.NewDecoder(rdr)
-	if err = respBodyDecoder.Decode(tokValidResp); err != nil {
-		return time.Time{}, err
+	if err = respBodyDecoder.Decode(&tok); err != nil {
+		return 0, err
 	}
 
 	if expiresInSecs, err =
-		strconv.Atoi(tokValidResp.ExpirationSec); err != nil {
-		return time.Time{}, err
+		strconv.Atoi(tok.ExpirationSec); err != nil {
+		return 0, err
 	}
 
-	return now.Add(
-		time.Duration(expiresInSecs * nsecPerSec)).Round(nsecPerSec), nil
+	return time.Second * time.Duration(expiresInSecs), nil
 }
 
 // SetApiURL is really not intended for production use but exists to ease

@@ -14,17 +14,14 @@ func decodeFailedApiResponse(resp *http.Response) error {
 	decoder := json.NewDecoder(tRdr)
 	respPayload := &requestFailedResp{}
 
-	// If we can successfully decode the failure payload, we lookup the status
-	// code in the status codes to errors map. If a matching error is found, it
-	// is returned to the caller. Otherwise we encode the response from the API
-	// as a ApiCallFailedError and return that to the caller.
+	// If we can successfully decode the failure payload we encode the response
+	// from the API as a ApiCallFailedError and return that to the caller.
+	// Otherwise we have to try to deal with JSON error parsing and return
+	// whatever we can figure out to the call to enable troubleshooting.
 	if err := decoder.Decode(respPayload); err == nil {
-		if mappedErr, ok := errorCodesToErrors[respPayload.Code]; ok {
-			err = mappedErr
-		} else {
-			err = &ApiCallFailedError{
-				apiResp: respPayload,
-			}
+		err = &ApiCallFailedError{
+			apiResp:        respPayload,
+			httpStatusCode: resp.StatusCode,
 		}
 		return err
 	}
@@ -143,7 +140,6 @@ func Authenticate(credentials *Credentials, authEndpointUrl string) (*Token, err
 	}
 
 	req, err := http.NewRequest(
-		// http.MethodPost, LyveCloudApiPrefix+"/auth/token", data)
 		http.MethodPost, authEndpointUrl, data)
 	req.Header = headers
 

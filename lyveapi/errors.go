@@ -1,6 +1,9 @@
 package lyveapi
 
-import "errors"
+import (
+	"encoding/json"
+	"errors"
+)
 
 var (
 	InvalidTokenErr         = errors.New("token presented to the API is invalid")
@@ -25,7 +28,8 @@ type requestFailedResp struct {
 }
 
 type ApiCallFailedError struct {
-	apiResp *requestFailedResp
+	apiResp        *requestFailedResp
+	httpStatusCode int
 }
 
 func (e *ApiCallFailedError) Code() string {
@@ -34,6 +38,10 @@ func (e *ApiCallFailedError) Code() string {
 
 func (e *ApiCallFailedError) Message() string {
 	return e.apiResp.Message
+}
+
+func (e *ApiCallFailedError) HttpStatusCode() int {
+	return e.httpStatusCode
 }
 
 func (e *ApiCallFailedError) Error() string {
@@ -50,5 +58,10 @@ func (e *ApiCallFailedError) Error() string {
 		code = "unknown"
 	}
 
-	return "API request error: " + message + " status code: " + code
+	return "request failed: " + message + " " + "(" + code + ")"
+}
+
+func (e *ApiCallFailedError) JSON() []byte {
+	b, _ := json.Marshal(e.apiResp)
+	return b
 }
