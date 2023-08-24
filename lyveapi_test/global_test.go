@@ -3,14 +3,17 @@ package lyveapi_test
 import "errors"
 
 const (
-	mockAuthTokenUri      = "/auth/token"
-	mockPermissionId1     = "alpha-permission"
-	mockPermissionId2     = "beta-permission"
-	mockApiEndpointUrl    = "https://localhost:8080/v2"
-	mockPermissionsUri    = "/permissions"
-	mockOnePermissionUri  = mockPermissionsUri + "/" + "mock-permission-1"
-	mockPermissionDelUri1 = mockPermissionsUri + "/" + mockPermissionId1
-	mockPermissionDelUri2 = mockPermissionsUri + "/" + mockPermissionId2
+	mockAuthTokenUri        = "/auth/token"
+	mockPermissionIdAlpha   = "alpha-permission"
+	mockPermission1         = "mock-permission-1"
+	mockPermission2         = "mock-permission-2"
+	mockPermissionIdBeta    = "beta-permission"
+	mockApiEndpointUrl      = "https://localhost:8080/v2"
+	mockPermissionsUri      = "/permissions"
+	mockPermissionCreateUri = mockPermissionsUri + "/" + "mock-permission-1"
+	mockPermissionUpdateUri = mockPermissionsUri + "/" + "mock-permission-2"
+	mockPermissionDelUri1   = mockPermissionsUri + "/" + mockPermissionIdAlpha
+	mockPermissionDelUri2   = mockPermissionsUri + "/" + mockPermissionIdBeta
 
 	createPermBadPolicyRespJSONObj = `{
 		"code": "InternalError",

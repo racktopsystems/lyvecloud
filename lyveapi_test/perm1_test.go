@@ -9,15 +9,9 @@ import (
 	"github.com/szaydel/lyvecloud/lyveapi"
 )
 
-const mockPermission1 = "mock-permission-1"
-
-const pCreateGoodRespBody = `{
-	"id": "mock-permission-id"
-  }`
-
 func TestPermissions(t *testing.T) {
 	const pGetByIdRespBody = `{
-		"id": "mock-permission-1",
+		"id": "mock-permission-10",
 		"name": "mock-all",
 		"description": "Mock description",
 		"type": "bucket-names",
@@ -46,6 +40,10 @@ func TestPermissions(t *testing.T) {
 		"createTime": "2023-08-11T19:15:00Z"
 	   }]`
 
+	const pCreateGoodRespBody = `{
+		"id": "mock-permission-id"
+	  }`
+
 	var permissionsListMock = apitest.NewMock().
 		Get(mockPermissionsUri).
 		RespondWith().
@@ -54,7 +52,7 @@ func TestPermissions(t *testing.T) {
 		End()
 
 	var permGetByIdMock = apitest.NewMock().
-		Get(mockOnePermissionUri).
+		Get(mockPermissionCreateUri).
 		RespondWith().
 		Body(pGetByIdRespBody).
 		Status(http.StatusOK).
@@ -74,6 +72,12 @@ func TestPermissions(t *testing.T) {
 		Status(http.StatusOK).
 		End()
 
+	var permUpdateMock = apitest.NewMock().
+		Put(mockPermissionUpdateUri).
+		RespondWith().
+		Status(http.StatusOK).
+		End()
+
 	apitest.New().
 		Report(apitest.SequenceDiagram()).
 		Mocks(permissionsListMock).
@@ -88,7 +92,7 @@ func TestPermissions(t *testing.T) {
 		Report(apitest.SequenceDiagram()).
 		Mocks(permGetByIdMock).
 		Handler(permissionsHandler()).
-		Get(mockOnePermissionUri).
+		Get(mockPermissionCreateUri).
 		Expect(t).
 		Body(pGetByIdRespBody).
 		Status(http.StatusOK).
@@ -107,10 +111,19 @@ func TestPermissions(t *testing.T) {
 	apitest.New().
 		Report(apitest.SequenceDiagram()).
 		Mocks(permGoodCreatePolicyMock).
-		Handler(permsGoodCreateHandler()).
+		Handler(permsCreateUpdateHandler()).
 		Post(mockPermissionsUri).
 		Expect(t).
 		Body(pCreateGoodRespBody).
+		Status(http.StatusOK).
+		End()
+
+	apitest.New().
+		Report(apitest.SequenceDiagram()).
+		Mocks(permUpdateMock).
+		Handler(permissionsHandler()).
+		Put(mockPermissionUpdateUri).
+		Expect(t).
 		Status(http.StatusOK).
 		End()
 }
@@ -138,8 +151,16 @@ func permissionsHandler() *http.ServeMux {
 			w.WriteHeader(http.StatusOK)
 
 		case http.MethodPost:
+			req := &lyveapi.Permission{
+				Name:        "mock-permission-with-bad-policy",
+				Description: "Mock description",
+				Type:        lyveapi.Policy,
+				Prefix:      "pre",
+				Policy:      `{"garbage": "ploicy"}`,
+				Actions:     lyveapi.AllOperations}
+
 			if err := permsBadHttpPost(
-				mockPermissionsUri, &permission); err != nil {
+				mockPermissionsUri, req, &permission); err != nil {
 				// The order here is important. First, call the WriteHeader
 				// method to set the http.StatusInternalServerError
 				// response code. Next, write the necessary JSON payload.
@@ -153,9 +174,9 @@ func permissionsHandler() *http.ServeMux {
 		}
 	})
 
-	handler.HandleFunc(mockOnePermissionUri, func(w http.ResponseWriter, r *http.Request) {
+	handler.HandleFunc(mockPermissionCreateUri, func(w http.ResponseWriter, r *http.Request) {
 		var permission lyveapi.Permission
-		if err := permGet(mockOnePermissionUri, &permission); err != nil {
+		if err := permGet(mockPermissionCreateUri, &permission); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -169,20 +190,53 @@ func permissionsHandler() *http.ServeMux {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	handler.HandleFunc(mockPermissionUpdateUri, func(w http.ResponseWriter, r *http.Request) {
+		var permission lyveapi.Permission
+		req := &lyveapi.Permission{
+			Name:        "mock-permission-with-policy-1",
+			Description: "Mock policy-type permission",
+			Type:        lyveapi.Policy,
+			Actions:     lyveapi.AllOperations,
+			Buckets:     []string{"alpha-bucket", "beta-bucket"},
+		}
+
+		if err := permsHttpPut(
+			mockPermissionUpdateUri, req, &permission); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
 	return handler
 }
 
-func permsGoodCreateHandler() *http.ServeMux {
+func permsHttpPut(path string, permission *lyveapi.Permission, response interface{}) error {
+	var client = &lyveapi.Client{}
+	client.SetApiURL(mockApiEndpointUrl)
+
+	permissionId := path[len(mockPermissionsUri)+1:]
+
+	return client.UpdatePermission(permissionId, permission)
+}
+
+func permsCreateUpdateHandler() *http.ServeMux {
 	var handler = http.NewServeMux()
 
 	handler.HandleFunc(mockPermissionsUri, func(w http.ResponseWriter, r *http.Request) {
 		var permission lyveapi.Permission
-		// var permissions lyveapi.PermissionList
 
 		switch r.Method {
 		case http.MethodPost:
+			req := &lyveapi.Permission{
+				Name:        "mock-permission-with-policy-1",
+				Description: "Mock policy-type permission",
+				Type:        lyveapi.Policy,
+				Policy:      "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"statement15feb1\",\"Effect\":\"Allow\",\"Action\":[\"s3:*\"],\"Resource\":[\"arn:aws:s3:::*/*\"]}]}",
+			}
+
 			if err := permsGoodHttpPost(
-				mockPermissionsUri, &permission); err != nil {
+				mockPermissionsUri, req, &permission); err != nil {
 				// The order here is important. First, call the WriteHeader
 				// method to set the http.StatusInternalServerError
 				// response code. Next, write the necessary JSON payload.
@@ -198,7 +252,6 @@ func permsGoodCreateHandler() *http.ServeMux {
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-
 			}
 		}
 	})
@@ -221,9 +274,9 @@ func permGet(path string, response interface{}) error {
 		*pListPtr = append(*pListPtr, *p...)
 		return nil
 
-	case mockOnePermissionUri:
+	case mockPermissionCreateUri:
 		var p *lyveapi.Permission
-		permissionId := mockOnePermissionUri[len(mockPermissionsUri+"/"):]
+		permissionId := mockPermissionCreateUri[len(mockPermissionsUri+"/"):]
 		if p, err = client.GetPermission(permissionId); err != nil {
 			return err
 		}
@@ -242,18 +295,11 @@ func permGet(path string, response interface{}) error {
 	return pathUnmatchedErr
 }
 
-func permsGoodHttpPost(path string, response interface{}) error {
+func permsGoodHttpPost(path string, permission *lyveapi.Permission, response interface{}) error {
 	var client = &lyveapi.Client{}
 	client.SetApiURL(mockApiEndpointUrl)
 
-	p := &lyveapi.Permission{
-		Name:        "mock-permission-with-policy-1",
-		Description: "Mock policy-type permission",
-		Type:        lyveapi.Policy,
-		Policy:      "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"statement15feb1\",\"Effect\":\"Allow\",\"Action\":[\"s3:*\"],\"Resource\":[\"arn:aws:s3:::*/*\"]}]}",
-	}
-
-	if resp, err := client.CreatePermission(p); err != nil {
+	if resp, err := client.CreatePermission(permission); err != nil {
 		return err
 	} else {
 		response.(*lyveapi.Permission).Id = resp.Id
@@ -262,20 +308,12 @@ func permsGoodHttpPost(path string, response interface{}) error {
 	return nil
 }
 
-func permsBadHttpPost(path string, response interface{}) error {
+func permsBadHttpPost(path string, permission *lyveapi.Permission, response interface{}) error {
 	var client = &lyveapi.Client{}
 	client.SetApiURL(mockApiEndpointUrl)
 
 	switch path {
 	case mockPermissionsUri:
-		policy := `{"garbage": "ploicy"}`
-		permission := &lyveapi.Permission{
-			Name:        mockPermission1,
-			Description: "Mock description",
-			Type:        lyveapi.Policy,
-			Prefix:      "pre",
-			Policy:      policy,
-			Actions:     lyveapi.AllOperations}
 		if _, err := client.CreatePermission(permission); err != nil {
 			return err
 		} else {
