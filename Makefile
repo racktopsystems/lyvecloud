@@ -9,6 +9,7 @@ cover:
 	go tool cover -html=$(COVERAGE_FILE)
 
 unit-test:
+	mkdir -p $(COVERAGE_DATA_DIR) && \
 	go test -cover -coverpkg=./... -coverprofile $(COVERAGE_FILE) -v ./...
 
 doc:
