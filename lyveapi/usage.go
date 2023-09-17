@@ -56,7 +56,7 @@ func (client *Client) GetMonthlyUsage(
 	fromYear uint,
 	toMonth Month,
 	toYear uint,
-) (*UsageMonthlyResp, error) {
+) (*MonthlyUsageResp, error) {
 	client.mtx.RLock()
 	endpoint := client.apiUrl + "/usage/monthly"
 	token := client.token
@@ -83,7 +83,7 @@ func (client *Client) GetMonthlyUsage(
 
 	respBodyDecoder := json.NewDecoder(rdr)
 
-	usageResp := &UsageMonthlyResp{}
+	usageResp := &MonthlyUsageResp{}
 
 	if err := respBodyDecoder.Decode(usageResp); err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (client *Client) GetMonthlyUsage(
 // the sub-account. If the information is queried with a sub-account, then
 // no information is returned in the UsageBySubAccount field, since sub-accounts
 // cannot have their own sub-accounts.
-func (client *Client) GetCurrentUsage() (*UsageCurrentResp, error) {
+func (client *Client) GetCurrentUsage() (*CurrentUsageResp, error) {
 	client.mtx.RLock()
 	endpoint := client.apiUrl + "/usage/current"
 	token := client.token
@@ -114,7 +114,7 @@ func (client *Client) GetCurrentUsage() (*UsageCurrentResp, error) {
 
 	respBodyDecoder := json.NewDecoder(rdr)
 
-	usageResp := &UsageCurrentResp{}
+	usageResp := &CurrentUsageResp{}
 
 	if err := respBodyDecoder.Decode(usageResp); err != nil {
 		return nil, err

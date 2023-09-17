@@ -120,11 +120,11 @@ type Usage struct {
 	SubAccounts  []SubAccount `json:"subAccounts,omitempty"`
 }
 
-// UsageMonthlyResp is the response object containing by month usage
+// MonthlyUsageResp is the response object containing by month usage
 // information by bucket. If the account performing the query is a sub-account,
 // the SubAccounts field will not contain any data, because sub-accounts cannot
 // contain sub-accounts.
-type UsageMonthlyResp struct {
+type MonthlyUsageResp struct {
 	// UsageByBucket contains a slice of Usage structs for all buckets under the master account or the sub-account for each month in the range.
 	UsageByBucket []Usage `json:"usageByBucket,omitempty"`
 	// UsageBySubAccount will be an empty slice unless the data is requested
@@ -133,11 +133,11 @@ type UsageMonthlyResp struct {
 	UsageBySubAccount []Usage `json:"usageBySubAccount,omitempty"`
 }
 
-// UsageCurrentResp is the response object containing usage information by
+// CurrentUsageResp is the response object containing usage information by
 // bucket. If the account performing the query is a sub-account, the SubAccounts
 // field will not contain any data, because sub-accounts cannot contain
 // sub-accounts.
-type UsageCurrentResp struct {
+type CurrentUsageResp struct {
 	// UsageByBucket contains a slice of Usage structs for all buckets under the master account or the sub-account for each month in the range.
 	UsageByBucket Usage `json:"usageByBucket,omitempty"`
 	// UsageBySubAccount will be an empty slice unless the data is requested
@@ -146,5 +146,5 @@ type UsageCurrentResp struct {
 	UsageBySubAccount struct {
 		TotalUsageGB float64      `json:"totalUsageGB"`
 		SubAccounts  []SubAccount `json:"subAccounts,omitempty"`
-	}
+	} `json:"usageBySubAccount,omitempty"`
 }
