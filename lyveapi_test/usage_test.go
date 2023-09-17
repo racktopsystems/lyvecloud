@@ -2,7 +2,6 @@ package lyveapi_test
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -292,7 +291,6 @@ func usageHandler() *http.ServeMux {
 	handler.HandleFunc(mockMonthlyUsageUri, func(w http.ResponseWriter, r *http.Request) {
 		var monthlyUsage lyveapi.MonthlyUsageResp
 
-		log.Print(r)
 		switch r.Method {
 		case http.MethodGet:
 			if err := usageGet(mockMonthlyUsageUri, r.URL, &monthlyUsage); err != nil {
