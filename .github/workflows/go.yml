@@ -3,9 +3,17 @@
 
 name: Build and test lyveapi project
 
+env:
+  USAGE_DOCS_FILE: docs/lyveapi/lyveapi-usage.txt
+  COVERAGE_HTML_FILE: coverage/coverage.html
+
 on:
   push:
-    branches: [ "master" ]
+    branches:
+      - "master"
+      - "release/**"
+      - "topic/**"
+
   pull_request:
     branches: [ "master" ]
 
@@ -27,5 +35,20 @@ jobs:
     - name: Test
       run: make unit-test
 
+    - name: Generate coverage report
+      run: make cover
+
     - name: Doc
       run: make doc
+
+    - name: Store generated library documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: lyveapi-documentation.txt
+        path: ${{ env.USAGE_DOCS_FILE }}
+
+    - name: Store generated coverage html
+      uses: actions/upload-artifact@v3
+      with:
+        name: lyveapi-coverage.html
+        path: ${{ env.COVERAGE_HTML_FILE }}
