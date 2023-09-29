@@ -84,6 +84,12 @@ type Bucket struct {
 	UsageGB float64 `json:"usageGB"` // UsageGB reports GBs used by bucket
 }
 
+// UsageInBytes converts from the gigabytes reported by the API to bytes. A
+// gigabyte (GB) is 1e9 bytes.
+func (b Bucket) UsageInBytes() float64 {
+	return 1e9 * b.UsageGB
+}
+
 // SubAccount contains summary usage information for the given sub-account.
 type SubAccount struct {
 	// SubAccountName is the human-friendly name of the given sub-account
