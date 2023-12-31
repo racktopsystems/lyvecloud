@@ -6,20 +6,27 @@ import (
 )
 
 var (
-	InvalidTokenErr         = errors.New("token presented to the API is invalid")
-	AuthenticationFailedErr = errors.New("authentication was unsuccessful; check supplied credentials")
-	PermissionExistsErr     = errors.New("permission name is already taken")
-	PolicyMissingErr        = errors.New("permission is missing required policy JSON document")
-	PermissionNoExistErr    = errors.New("permission does not exist")
+	InvalidTokenErrMsg         = "token presented to the API is invalid"
+	ExpiredTokenErrMsg         = "token presented to the API is already expired"
+	AuthenticationFailedErrMsg = "authentication was unsuccessful; check supplied credentials"
+	PermissionExistsErrMsg     = "permission name is already taken"
+	PolicyMissingErrMsg        = "permission is missing required policy JSON document"
+	PermissionNoExistErrMsg    = "permission does not exist"
+
+	// These errors are not something we get back from the API and convert
+	// into an ApiCallFailedError. These are internal, indicating improper
+	// usage or some other fault condition.
+	PolicyMissingErr = errors.New(PermissionExistsErrMsg)
 )
 
-var errorCodesToErrors = map[string]error{
-	"InvalidToken":         InvalidTokenErr,
-	"AuthenticationFailed": AuthenticationFailedErr,
+var errorCodesToErrors = map[string]string{
+	"ExpiredToken":         ExpiredTokenErrMsg,
+	"InvalidToken":         InvalidTokenErrMsg,
+	"AuthenticationFailed": AuthenticationFailedErrMsg,
 	// We are seemingly getting a trailing space in auth failure responses.
-	"AuthenticationFailed ":       AuthenticationFailedErr,
-	"PermissionNameAlreadyExists": PermissionExistsErr,
-	"PermissionNotFound":          PermissionNoExistErr,
+	"AuthenticationFailed ":       AuthenticationFailedErrMsg,
+	"PermissionNameAlreadyExists": PermissionExistsErrMsg,
+	"PermissionNotFound":          PermissionNoExistErrMsg,
 }
 
 type requestFailedResp struct {
@@ -46,7 +53,9 @@ func (e *ApiCallFailedError) HttpStatusCode() int {
 
 func (e *ApiCallFailedError) Error() string {
 	var code, message string
-	if e.apiResp.Message != "" {
+	if v, ok := errorCodesToErrors[e.apiResp.Code]; ok {
+		message = v
+	} else if e.apiResp.Message != "" {
 		message = e.apiResp.Message
 	} else {
 		message = "no additional information given"
