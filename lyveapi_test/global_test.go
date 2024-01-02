@@ -16,6 +16,7 @@ const (
 	mockPermissionDelUri2   = mockPermissionsUri + "/" + mockPermissionIdBeta
 	mockCurrentUsageUri     = "/usage/current"
 	mockMonthlyUsageUri     = "/usage/monthly"
+	mockSvcAcctsUri         = "/service-accounts"
 
 	createPermBadPolicyRespJSONObj = `{
 		"code": "InternalError",

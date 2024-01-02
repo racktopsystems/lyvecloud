@@ -9,6 +9,7 @@ import (
 
 func Test_decodeFailedApiResponse(t *testing.T) {
 	t.Parallel()
+
 	resp := &http.Response{}
 
 	type testCase struct {

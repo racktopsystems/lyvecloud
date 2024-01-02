@@ -99,8 +99,11 @@ func (client *Client) GetServiceAccount(svcAcctId string) (*ServiceAcct, error) 
 	return acctInfo, nil
 }
 
+// UpdateServiceAccount updates an existing service account with changed
+// settings in updatesReq and returns a nil and an error if decoding of the
+// response fails, otherwise a decoded object and nil error is returned.
 func (client *Client) UpdateServiceAccount(
-	svcAcctId string, changes ServiceAcctUpdateReq) error {
+	svcAcctId string, updatesReq *ServiceAcct) error {
 	client.mtx.RLock()
 	endpoint := client.apiUrl + "/service-accounts"
 	url := endpoint + "/" + svcAcctId
@@ -111,8 +114,7 @@ func (client *Client) UpdateServiceAccount(
 	var rdr io.ReadCloser
 	var data []byte
 
-	if data, err = json.Marshal(changes); err != nil {
-
+	if data, err = json.Marshal(updatesReq); err != nil {
 		return err
 	}
 

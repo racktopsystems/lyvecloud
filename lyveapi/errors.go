@@ -6,6 +6,7 @@ import (
 )
 
 var (
+	InvalidPermissionsErrMsg   = "permission IDs are not known to the API; fetch a list of permissions to obtain correct IDs"
 	InvalidTokenErrMsg         = "token presented to the API is invalid"
 	ExpiredTokenErrMsg         = "token presented to the API is already expired"
 	AuthenticationFailedErrMsg = "authentication was unsuccessful; check supplied credentials"
@@ -22,6 +23,7 @@ var (
 var errorCodesToErrors = map[string]string{
 	"ExpiredToken":         ExpiredTokenErrMsg,
 	"InvalidToken":         InvalidTokenErrMsg,
+	"InvalidPermissions":   InvalidPermissionsErrMsg,
 	"AuthenticationFailed": AuthenticationFailedErrMsg,
 	// We are seemingly getting a trailing space in auth failure responses.
 	"AuthenticationFailed ":       AuthenticationFailedErrMsg,

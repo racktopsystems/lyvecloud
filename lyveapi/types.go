@@ -1,5 +1,12 @@
 package lyveapi
 
+import (
+	"strconv"
+	"time"
+
+	"github.com/szaydel/lyvecloud/lyveapi/monotime"
+)
+
 type Credentials struct {
 	AccountId string `json:"accountId"`
 	AccessKey string `json:"accessKey"`
@@ -21,19 +28,20 @@ type CreateServiceAcctResp struct {
 
 // Depending on the API used, some of these fields may or may not be used.
 type ServiceAcct struct {
-	Id          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Enabled     bool     `json:"enabled,omitempty"`
-	ReadyState  bool     `json:"readyState,omitempty"`
-	Permissions []string `json:"permissions,omitempty"`
+	Id             string   `json:"id"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	Enabled        bool     `json:"enabled"`
+	ExpirationDate string   `json:"expirationDate"`
+	ReadyState     bool     `json:"readyState"`
+	Permissions    []string `json:"permissions,omitempty"`
 }
 
-type ServiceAcctUpdateReq struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Permissions []string `json:"permissions,omitempty"`
-}
+// type ServiceAcctUpdateReq struct {
+// 	Name        string   `json:"name"`
+// 	Description string   `json:"description,omitempty"`
+// 	Permissions []string `json:"permissions,omitempty"`
+// }
 
 type ServiceAcctList []ServiceAcct
 
@@ -78,15 +86,27 @@ type Token struct {
 	ExpirationSec string `json:"expirationSec,omitempty"`
 }
 
+func (t Token) ExpiresMonoNanos() (time.Duration, error) {
+	var err error
+	var secs int64
+
+	if secs, err = strconv.ParseInt(t.ExpirationSec, 10, 64); err != nil {
+		return 0, err
+	}
+
+	return time.Duration(secs*1e9) + monotime.Monotonic(), nil
+}
+
 // Bucket describes usage of a particular bucket.
 type Bucket struct {
 	Name    string  `json:"name"`    // Name is the name of the given bucket
 	UsageGB float64 `json:"usageGB"` // UsageGB reports GBs used by bucket
 }
 
-// UsageInBytes converts from the gigabytes reported by the API to bytes. A
-// gigabyte (GB) is 1e9 bytes.
-func (b Bucket) UsageInBytes() float64 {
+// BytesUsed converts from the gigabytes reported by the API to bytes. The API
+// uses base10 values for reporting usage, where a Gigabyte is 1000 Megabytes
+// and 1 Megabyte is 1000 Kilobytes, etc.
+func (b Bucket) BytesUsed() float64 {
 	return 1e9 * b.UsageGB
 }
 
@@ -111,19 +131,59 @@ type SubAccount struct {
 	Trial int `json:"trial,omitempty"`
 }
 
+type Buckets []Bucket
+
+// BytesUsedCombined returns a sum of usages across all buckets in the given
+// list of buckets.
+func (b Buckets) BytesUsedCombined() uint64 {
+	var tot float64
+	for _, b := range b {
+		tot += b.BytesUsed()
+	}
+
+	return uint64(tot)
+}
+
+func (b Buckets) BytesUsedByName(name string) uint64 {
+	for _, b := range b {
+		if b.Name == name {
+			return uint64(b.UsageGB)
+		}
+	}
+	return 0
+}
+
+type Usages []Usage
+
+func (us Usages) MonthlyTotalUsageGB() map[MonthYearTuple]float64 {
+	m := make(map[MonthYearTuple]float64, len(us))
+	for _, u := range us {
+		my := MonthYearTuple{u.Month, u.Year}
+		m[my] = u.TotalUsageGB
+	}
+	return m
+}
+
 // Usage reports various bucket usage details and included fields will vary
 // depending upon whether the query is for current usage or monthly usage.
 type Usage struct {
 	// Year only used in monthly usage report
-	Year uint16 `json:"year,omitempty"`
+	Year Year `json:"year,omitempty"`
 	// Month only used in monthly usage report
 	Month Month `json:"month,omitempty"`
 	// NumBuckets only used in current usage report
 	NumBuckets int `json:"numBuckets,omitempty"`
 	// TotalUsageGB is the amount of space consumed in Gigabytes (hopefully)
 	TotalUsageGB float64      `json:"totalUsageGB"`
-	Buckets      []Bucket     `json:"buckets,omitempty"`
+	Buckets      Buckets      `json:"buckets,omitempty"`
 	SubAccounts  []SubAccount `json:"subAccounts,omitempty"`
+}
+
+// BytesUsedCombined returns combined usage in bytes across all buckets in the
+// given list of buckets. The API uses base10 values for reporting usage, where
+// a Gigabyte is 1000 Megabytes and 1 Megabyte is 1000 Kilobytes, etc.
+func (u Usage) BytesUsedCombined() uint64 {
+	return uint64(u.TotalUsageGB * 1e9)
 }
 
 // MonthlyUsageResp is the response object containing by month usage
@@ -132,11 +192,11 @@ type Usage struct {
 // contain sub-accounts.
 type MonthlyUsageResp struct {
 	// UsageByBucket contains a slice of Usage structs for all buckets under the master account or the sub-account for each month in the range.
-	UsageByBucket []Usage `json:"usageByBucket,omitempty"`
+	UsageByBucket Usages `json:"usageByBucket,omitempty"`
 	// UsageBySubAccount will be an empty slice unless the data is requested
 	// with credentials belonging to a "master" account. In most instances data
 	// will be queried with credentials belonging to a sub-account.
-	UsageBySubAccount []Usage `json:"usageBySubAccount,omitempty"`
+	UsageBySubAccount Usages `json:"usageBySubAccount,omitempty"`
 }
 
 // CurrentUsageResp is the response object containing usage information by
@@ -153,4 +213,16 @@ type CurrentUsageResp struct {
 		TotalUsageGB float64      `json:"totalUsageGB"`
 		SubAccounts  []SubAccount `json:"subAccounts,omitempty"`
 	} `json:"usageBySubAccount,omitempty"`
+	// UsageBySubAccount UsageBySubAccount `json:"usageBySubAccount,omitempty"`
 }
+
+// type UsageBySubAccount struct {
+// 	TotalUsageGB float64      `json:"totalUsageGB"`
+// 	SubAccounts  []SubAccount `json:"subAccounts,omitempty"`
+// }
+
+// // BytesUsedCombined returns combined usage across all buckets for the given
+// // sub-account as bytes.
+// func (usages UsageBySubAccount) BytesUsedCombined() uint64 {
+// 	return uint64(usages.TotalUsageGB * 1e9)
+// }

@@ -33,7 +33,7 @@ jobs:
       run: make build
 
     - name: Test
-      run: make unit-test
+      run: make unittest
 
     - name: Generate coverage report
       run: make cover

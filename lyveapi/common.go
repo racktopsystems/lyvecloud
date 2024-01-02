@@ -8,6 +8,10 @@ import (
 	"net/http"
 )
 
+// decodeFailedApiResponse takes a response object from the API and converts it
+// into a more user-friendly native representation. It returns an exported
+// error type, which has methods for accessing the status code from the API and
+// the message.
 func decodeFailedApiResponse(resp *http.Response) error {
 	body := &bytes.Buffer{}
 	tRdr := io.TeeReader(resp.Body, body)
@@ -50,6 +54,9 @@ func decodeFailedApiResponse(resp *http.Response) error {
 	return errors.New("dubious response from the API: " + string(bodySlc))
 }
 
+// apiRequestAuthenticated packages up requests to the API without attempting
+// to authenticate first. A valid token is required to complete requests
+// successfully.
 func apiRequestAuthenticated(
 	token, method, url string, payload []byte) (io.ReadCloser, error) {
 	headers := map[string][]string{
@@ -93,6 +100,13 @@ func apiRequestAuthenticated(
 		return nil, err
 	}
 
+	// DEBUGGING:
+	// buf, _ := io.ReadAll(resp.Body)
+	// body := bytes.NewBuffer(buf)
+	// resp.Body = io.NopCloser(body)
+
+	// log.Printf("DEBUG (response body): %s", body.String())
+
 	// Check response from the API and if resp.StatusCode != http.StatusOK, we
 	// are going to have access to the error object which we should return to
 	// the caller.
@@ -121,6 +135,10 @@ func apiRequestAuthenticated(
 	return resp.Body, nil
 }
 
+// Authenticate attempts to authenticate against the API and returns a token
+// upon successful authentication. The API will expire this token after 24
+// hours. This expiration period appears to be fixed but Lyve Cloud may change
+// it at any time.
 func Authenticate(credentials *Credentials, authEndpointUrl string) (*Token, error) {
 	var data *bytes.Buffer
 

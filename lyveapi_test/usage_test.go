@@ -2,30 +2,16 @@ package lyveapi_test
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/steinfletcher/apitest"
 	"github.com/szaydel/lyvecloud/lyveapi"
 )
-
-// var monthFromNumericString = map[string]lyveapi.Month{
-// 	"0":  lyveapi.INVALID,
-// 	"1":  lyveapi.JAN,
-// 	"2":  lyveapi.FEB,
-// 	"3":  lyveapi.MAR,
-// 	"4":  lyveapi.APR,
-// 	"5":  lyveapi.MAY,
-// 	"6":  lyveapi.JUN,
-// 	"7":  lyveapi.JUL,
-// 	"8":  lyveapi.AUG,
-// 	"9":  lyveapi.SEP,
-// 	"10": lyveapi.OCT,
-// 	"11": lyveapi.NOV,
-// 	"12": lyveapi.DEC,
-// }
 
 func TestUsage(t *testing.T) {
 	const currentUsageRespBody = `{
@@ -356,4 +342,178 @@ func usageGet(path string, url *url.URL, response interface{}) error {
 	}
 
 	return pathUnmatchedErr
+}
+
+func Test_UsageBytesUsedCombined(t *testing.T) {
+	t.Parallel()
+
+	const expectedUsageBytes = 77398902000000
+	usage := lyveapi.Buckets{
+		lyveapi.Bucket{
+			Name:    "a",
+			UsageGB: 493.52,
+		},
+		lyveapi.Bucket{
+			Name:    "b",
+			UsageGB: 34.67,
+		},
+		lyveapi.Bucket{
+			Name:    "c",
+			UsageGB: 67245.034,
+		},
+		lyveapi.Bucket{
+			Name:    "d",
+			UsageGB: 9625.678,
+		},
+	}
+	if usage.BytesUsedCombined() != expectedUsageBytes {
+		t.Errorf("Unexpected usage; expected: %d, actual: %d", expectedUsageBytes, usage.BytesUsedCombined())
+	}
+}
+
+func Test_UsageBytesUsedCombinedRangeLimit(t *testing.T) {
+	t.Parallel()
+
+	// Upper limit of what we can support is 'math.MaxUint64'.
+	const upperLimit uint64 = math.MaxUint64
+	const lowerAcceptableLimit uint64 = 1 << 63
+
+	const expectedUsageLimit = upperLimit
+	usage := lyveapi.Buckets{
+		lyveapi.Bucket{
+			Name:    "a",
+			UsageGB: float64(upperLimit),
+		},
+		lyveapi.Bucket{
+			Name:    "b",
+			UsageGB: float64(upperLimit),
+		},
+		lyveapi.Bucket{
+			Name:    "c",
+			UsageGB: float64(upperLimit),
+		},
+	}
+
+	if usage.BytesUsedCombined() < lowerAcceptableLimit {
+		t.Errorf("Expected combined usage to support at least: %d bytes, actual: %d",
+			lowerAcceptableLimit, usage.BytesUsedCombined())
+	}
+}
+
+func Test_UsagesMonthlyTotalGB(t *testing.T) {
+	t.Parallel()
+
+	var expectedUsagesByMonth = map[lyveapi.MonthYearTuple]float64{
+		{Month: 8, Year: 2023}:  36466.3927,
+		{Month: 9, Year: 2023}:  36498.950999999994,
+		{Month: 10, Year: 2023}: 36676.30099999999,
+		{Month: 11, Year: 2023}: 34824.49,
+	}
+	const encodedUsageByBucket = `{
+		"usageByBucket": [
+		  {
+			"buckets": [
+			  {
+				"name": "alpha",
+				"usageGB": 534.52
+			  },
+			  {
+				"name": "beta",
+				"usageGB": 34567.2827
+			  },
+			  {
+				"name": "gamma",
+				"usageGB": 516.24
+			  },
+			  {
+				"name": "delta",
+				"usageGB": 848.35
+			  }
+			],
+			"month": 8,
+			"totalUsageGB": 36466.3927,
+			"year": 2023
+		  },
+		  {
+			"buckets": [
+			  {
+				"name": "alpha",
+				"usageGB": 534.52
+			  },
+			  {
+				"name": "beta",
+				"usageGB": 34575.261
+			  },
+			  {
+				"name": "gamma",
+				"usageGB": 516.24
+			  },
+			  {
+				"name": "delta",
+				"usageGB": 872.93
+			  }
+			],
+			"month": 9,
+			"totalUsageGB": 36498.950999999994,
+			"year": 2023
+		  },
+		  {
+			"buckets": [
+			  {
+				"name": "alpha",
+				"usageGB": 534.52
+			  },
+			  {
+				"name": "beta",
+				"usageGB": 34575.261
+			  },
+			  {
+				"name": "gamma",
+				"usageGB": 693.59
+			  },
+			  {
+				"name": "delta",
+				"usageGB": 872.93
+			  }
+			],
+			"month": 10,
+			"totalUsageGB": 36676.30099999999,
+			"year": 2023
+		  },
+		  {
+			"buckets": [
+			  {
+				"name": "alpha",
+				"usageGB": 534.52
+			  },
+			  {
+				"name": "beta",
+				"usageGB": 32723.45
+			  },
+			  {
+				"name": "gamma",
+				"usageGB": 693.59
+			  },
+			  {
+				"name": "delta",
+				"usageGB": 872.93
+			  }
+			],
+			"month": 11,
+			"totalUsageGB": 34824.49,
+			"year": 2023
+		  }
+		]
+	  }`
+
+	resp := &lyveapi.MonthlyUsageResp{}
+	if err := json.NewDecoder(strings.NewReader(encodedUsageByBucket)).Decode(resp); err != nil {
+		t.Fatal(err)
+	}
+
+	for k, v := range resp.UsageByBucket.MonthlyTotalUsageGB() {
+		if expectedUsagesByMonth[k] != v {
+			t.Errorf("Unable to find expected usage %v => %v", k, v)
+		}
+	}
 }

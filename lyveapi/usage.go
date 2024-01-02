@@ -12,8 +12,7 @@ import (
 type Month uint8
 
 const (
-	INVALID Month = iota
-	JAN
+	JAN Month = iota
 	FEB
 	MAR
 	APR
@@ -29,19 +28,26 @@ const (
 
 func (m Month) String() string {
 	return map[Month]string{
-		JAN: "1",
-		FEB: "2",
-		MAR: "3",
-		APR: "4",
-		MAY: "5",
-		JUN: "6",
-		JUL: "7",
-		AUG: "8",
-		SEP: "9",
-		OCT: "10",
-		NOV: "11",
-		DEC: "12",
+		JAN: "0",
+		FEB: "1",
+		MAR: "2",
+		APR: "3",
+		MAY: "4",
+		JUN: "5",
+		JUL: "6",
+		AUG: "7",
+		SEP: "8",
+		OCT: "9",
+		NOV: "10",
+		DEC: "11",
 	}[m]
+}
+
+type Year uint16
+
+type MonthYearTuple struct {
+	Month Month
+	Year  Year
 }
 
 // GetMonthlyUsage retrieves historical data, in monthly increments

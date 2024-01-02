@@ -3,7 +3,6 @@ package lyveapi
 import "testing"
 
 func TestApiCallFailedErrorMsg(t *testing.T) {
-
 	t.Parallel()
 
 	const msg1 = "This is a test message"
