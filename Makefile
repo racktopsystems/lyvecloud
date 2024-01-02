@@ -1,4 +1,4 @@
-.PHONY: build doc cover unit-test
+.PHONY: build doc cover unittest
 
 COVERAGE_DATA_DIR := coverage
 COVERAGE_FILE := $(COVERAGE_DATA_DIR)/coverage.txt
@@ -13,7 +13,7 @@ cover:
 	@echo "Generating library test coverage data"
 	@go tool cover -html=$(COVERAGE_FILE) -o $(COVERAGE_HTML_FILE)
 
-unit-test:
+unittest:
 	@echo "Running unit tests"
 	@mkdir -p $(COVERAGE_DATA_DIR) && \
 	go test -cover -coverpkg=./... -coverprofile $(COVERAGE_FILE) -v ./...
