@@ -129,7 +129,11 @@ func apiRequestAuthenticated(
 		// If we encountered an issue decoding the body, return nil along with
 		// the error surfaced during decoding. Otherwise return nil along with
 		// decoded error as ApiCallFailedError.
-		return nil, decodeFailedApiResponse(resp)
+		if resp.ContentLength > 0 {
+			return nil, decodeFailedApiResponse(resp)
+		} else {
+			return nil, errors.New("Unexpected empty body in the response")
+		}
 	}
 
 	// Handle http.StatusOK response next.
