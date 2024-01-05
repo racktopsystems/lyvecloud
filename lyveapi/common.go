@@ -37,29 +37,42 @@ func decodeFailedApiResponse(resp *http.Response) error {
 	// We expect that this is HTML and starts with a '<head>' and has multiple
 	// lines. We want to eliminate the '\r\n' bits and present this garbage as a
 	// single line, mostly for debug-ability.
-	var errMsg string
+	var errMsg = "unable to decode response body"
 	if bodySlc, err := io.ReadAll(body); err != nil {
-		return errors.New("Failed to read contents of the response body")
+		return errors.Join(
+			errors.New("failed to read contents of the response body"), err)
 	} else {
 		if len(bodySlc) > 0 {
 			if bodySlc[0] == '<' {
 				var c int
+				var slash bool
 				b := make([]byte, len(bodySlc))
 				for _, v := range bodySlc {
-					if v == '\n' || v == '\r' {
+					// Special characters like newline and carriage return are
+					// detected in two passes due to the leading slash.
+					switch v {
+					case '\\':
+						slash = true
 						continue
+					case 'v', 'n':
+						if slash {
+							slash = false
+							continue
+						}
 					}
+
 					b[c] = v
 					c++
 				}
-				bodySlc = b
-				errMsg = string(bodySlc)
+
+				errMsg = string(b[:c])
 			}
 		}
 	}
 
 	// At this point we may have some garbage, but let's return that anyway. :(
-	return errors.New("dubious response from the API: " + errMsg)
+	return ApiErrorDecodingErr(
+		errors.New("dubious response from the API: " + errMsg))
 }
 
 // apiRequestAuthenticated packages up requests to the API without attempting
