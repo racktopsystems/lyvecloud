@@ -20,6 +20,8 @@ var (
 	PolicyMissingErr = errors.New(PermissionExistsErrMsg)
 )
 
+type ApiErrorDecodingErr error
+
 var errorCodesToErrors = map[string]string{
 	"ExpiredToken":         ExpiredTokenErrMsg,
 	"InvalidToken":         InvalidTokenErrMsg,
