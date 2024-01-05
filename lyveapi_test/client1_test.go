@@ -2,6 +2,7 @@ package lyveapi_test
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"testing"
@@ -11,14 +12,18 @@ import (
 	"github.com/szaydel/lyvecloud/lyveapi"
 )
 
+const mockApiAuthenticationUrl = mockApiEndpointUrl + mockAuthTokenUri
+
 func TestNewClient(t *testing.T) {
+	const mockCredentialBody = `{"accountId": "mock-account","accessKey": "alpha-beta","secret": "gamma-delta"}`
+
 	const mockAuthTokenRespBody = `{ 
-		"token": "this-is-a-mock-token",
+		"token": "alpha-beta-gamma-delta",
 		"expirationSec": "864000"
 	}`
 
 	var tokenValidationMock = apitest.NewMock().
-		Post(mockAuthTokenUri).
+		Post(mockApiAuthenticationUrl).
 		RespondWith().
 		Body(mockAuthTokenRespBody).
 		Status(http.StatusOK).
@@ -27,31 +32,36 @@ func TestNewClient(t *testing.T) {
 	apitest.New().
 		Report(apitest.SequenceDiagram()).
 		Mocks(tokenValidationMock).
-		Handler(tokenHandler1()).
-		Post(mockAuthTokenUri).
+		Handler(authenticationHandler()).
+		Post(mockApiAuthenticationUrl).
+		JSON(mockCredentialBody).
 		Expect(t).
 		Body(mockAuthTokenRespBody).
 		Status(http.StatusOK).
 		End()
 }
 
-func tokenHandler1() *http.ServeMux {
+func authenticationHandler() *http.ServeMux {
 	var handler = http.NewServeMux()
-	handler.HandleFunc(mockAuthTokenUri, func(w http.ResponseWriter, r *http.Request) {
+	handler.HandleFunc("/v2/auth/token", func(w http.ResponseWriter, r *http.Request) {
 		var token lyveapi.Token
 		switch r.Method {
-		// case http.MethodGet:
-		// 	if err := authToken(mockAuthTokenUri, &token); err != nil {
-		// 		w.WriteHeader(http.StatusInternalServerError)
-		// 		return
-		// 	}
 		case http.MethodPost:
-			creds := lyveapi.Credentials{
-				AccountId: "mock-account",
-				AccessKey: "mock-key",
-				Secret:    "mock-secret",
+			var credBytes []byte
+			if b, err := io.ReadAll(r.Body); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			} else {
+				credBytes = b
 			}
-			if err := doNewClientToken(mockAuthTokenUri, &creds, &token); err != nil {
+
+			creds := lyveapi.Credentials{}
+			if err := json.Unmarshal(credBytes, &creds); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			if err := invokeNewClientFactory(mockApiEndpointUrl, &creds, &token); err != nil {
 				// The order here is important. First, call the WriteHeader
 				// method to set the http.StatusForbidden response code.
 				// Next, write the necessary JSON payload.
@@ -75,21 +85,18 @@ func tokenHandler1() *http.ServeMux {
 	return handler
 }
 
-func doNewClientToken(path string, creds *lyveapi.Credentials, response interface{}) error {
+func invokeNewClientFactory(path string, creds *lyveapi.Credentials, response interface{}) error {
 	var err error
 	var client *lyveapi.Client
-	// client.SetApiURL(mockApiEndpointUrl)
 
 	switch path {
-	case mockAuthTokenUri:
-		if client, err = lyveapi.NewClient(creds, mockApiEndpointUrl); err != nil {
+	case mockApiEndpointUrl:
+		if client, err = lyveapi.NewClient(creds, path); err != nil {
 			return err
 		}
-		// if token, err = lyveapi.Authenticate(&lyveapi.Credentials{}, mockApiEndpointUrl+path); err != nil {
-		// 	return err
-		// }
 
-		seconds := client.ExpiresAfter().Sub(time.Now().Round(1_000_000_000)).Milliseconds() / 1000
+		seconds := client.ExpiresAfter().Sub(time.Now().Round(1_000_000_000)).
+			Milliseconds() / 1000
 
 		expiresInString := strconv.FormatInt(seconds, 10)
 

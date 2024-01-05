@@ -2,6 +2,7 @@ package lyveapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -139,7 +140,7 @@ func apiRequestAuthenticated(
 // upon successful authentication. The API will expire this token after 24
 // hours. This expiration period appears to be fixed but Lyve Cloud may change
 // it at any time.
-func Authenticate(credentials *Credentials, authEndpointUrl string) (*Token, error) {
+func Authenticate(ctx context.Context, credentials *Credentials, authEndpointUrl string) (*Token, error) {
 	var data *bytes.Buffer
 
 	headers := map[string][]string{
@@ -157,8 +158,8 @@ func Authenticate(credentials *Credentials, authEndpointUrl string) (*Token, err
 		data = bytes.NewBuffer(buf)
 	}
 
-	req, err := http.NewRequest(
-		http.MethodPost, authEndpointUrl, data)
+	req, err := http.NewRequestWithContext(
+		ctx, http.MethodPost, authEndpointUrl+"/auth/token", data)
 	req.Header = headers
 
 	if err != nil {
