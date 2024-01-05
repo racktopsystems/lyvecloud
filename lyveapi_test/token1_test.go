@@ -1,6 +1,7 @@
 package lyveapi_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -154,7 +155,10 @@ func doTokenPost(path string, response interface{}) error {
 
 	switch path {
 	case mockAuthTokenUri:
-		if token, err = lyveapi.Authenticate(&lyveapi.Credentials{}, mockApiEndpointUrl+path); err != nil {
+		if token, err = lyveapi.Authenticate(
+			context.Background(),
+			&lyveapi.Credentials{},
+			mockApiEndpointUrl+path); err != nil {
 			return err
 		}
 		response.(*lyveapi.Token).Token = token.Token

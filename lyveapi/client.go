@@ -1,6 +1,7 @@
 package lyveapi
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,7 +16,8 @@ type tokenDetails struct {
 	// After this time the token will expire and must be renewed.
 	expiresAfter time.Time
 	// Timestamp of token issuance by the API.
-	issuedTimestamp time.Time
+	issuedTimestamp  time.Time
+	expiresMonoNanos time.Duration
 }
 
 // Client is the structure used for interaction with the Lyve Cloud API through
@@ -44,27 +46,48 @@ func NewCredentials(accountId, accessKey, secret string) *Credentials {
 // API will not be possible. On success, this function returns a pointer to
 // an initialized Client struct and nil error. On failure, the function returns
 // a nil instead of a pointer to Client and an error.
+// This function does not allow the consumer to pass a context to the
+// underlying HTTP client. If the consumer wants to pass a context to the http
+// client, please use NewClientWithContext factory function instead of this
+// function.
 //
 // Arguments:
 //
-// credentials are exchanged with the API for an API token.
-// apiUrl is the base endpoint URL for the API. If an empty string is supplied,
-// we fallback to the default base endpoint URL. This parameter is primarily
-// useful for testing and not everyday production operations.
+// credentials -- API authentication creds which the API will exchange for an
+// API token with a limited lifetime.
+//
+// apiUrl -- Base endpoint URL for the Lyve Cloud API. If an empty string is
+// supplied, we fallback to the default Lyve Cloud API base endpoint URL. This
+// parameter is primarily useful for testing and not everyday production
+// operations.
 func NewClient(credentials *Credentials, apiUrl string) (*Client, error) {
+	return newClientImpl(context.Background(), credentials, apiUrl)
+}
+
+// NewClientWithContext is a factory function which is functionally identical
+// to NewClient(...) with the only difference being the context parameter as
+// the first argument. See documentation for the NewClient(...) factory
+// function for usage details.
+func NewClientWithContext(
+	ctx context.Context, credentials *Credentials, apiUrl string) (*Client, error) {
+	return newClientImpl(ctx, credentials, apiUrl)
+}
+
+func newClientImpl(
+	ctx context.Context, credentials *Credentials, apiUrl string) (*Client, error) {
 	const roundTo = nsecPerSec
 
-	// If there is nothing passed-in for apiUrl, use default LyveCloud API URL.
+	// If there is nothing passed-in for apiUrl, use default Lyve Cloud API URL.
 	if apiUrl == "" {
 		apiUrl = LyveCloudApiPrefix
 	}
 
 	var auth *Token
-	var authEndpointUrl = apiUrl + "/auth/token"
+	var authEndpointUrl = apiUrl
 	var err error
 	var tokValidForSeconds int
 
-	if auth, err = Authenticate(credentials, authEndpointUrl); err != nil {
+	if auth, err = Authenticate(ctx, credentials, authEndpointUrl); err != nil {
 		return nil, err
 	}
 
@@ -155,6 +178,13 @@ func (client *Client) ExpiresAfter() time.Time {
 	return expiresAfter
 }
 
+// func (client *Client) ExpiresAfterMonoNanos() time.Duration {
+// 	client.mtx.RLock()
+// 	expiresAfter := client.expiresMonoNanos
+// 	client.mtx.RUnlock()
+// 	return expiresAfter
+// }
+
 // TokenExpired returns true when the token is believed to be expired.
 func (client *Client) TokenExpired() bool {
 	client.mtx.RLock()
@@ -218,6 +248,36 @@ func getTokenExpiresDuration(token, apiUrl string) (time.Duration, error) {
 
 	return time.Second * time.Duration(expiresInSecs), nil
 }
+
+// // getTokenExpiresSeconds returns the number of seconds relative to some
+// // definition of "now", according to the server, during which the token remains
+// // valid.
+// func getTokenExpiresSeconds(token, apiUrl string) (time.Duration, error) {
+// 	var err error
+// 	var rdr io.ReadCloser
+
+// 	var endpoint string
+// 	if apiUrl != "" {
+// 		endpoint = apiUrl + "/auth/token"
+// 	} else {
+// 		endpoint = LyveCloudApiPrefix + "/auth/token"
+// 	}
+
+// 	if rdr, err = apiRequestAuthenticated(
+// 		token, http.MethodGet, endpoint, nil); err != nil {
+// 		return 0, err
+// 	}
+
+// 	defer rdr.Close()
+
+// 	tok := Token{}
+// 	respBodyDecoder := json.NewDecoder(rdr)
+// 	if err = respBodyDecoder.Decode(&tok); err != nil {
+// 		return 0, err
+// 	}
+
+// 	return tok.ExpiresMonoNanos()
+// }
 
 // SetApiURL is really not intended for production use but exists to ease
 // certain testing aspects. If you are using it outside of testing, you should
