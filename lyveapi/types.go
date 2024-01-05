@@ -136,9 +136,9 @@ type Buckets []Bucket
 // BytesUsedCombined returns a sum of usages across all buckets in the given
 // list of buckets.
 func (b Buckets) BytesUsedCombined() uint64 {
-	var tot float64
+	var tot uint64
 	for _, b := range b {
-		tot += b.BytesUsed()
+		tot += uint64(b.BytesUsed())
 	}
 
 	return uint64(tot)
