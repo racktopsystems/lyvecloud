@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/racktopsystems/lyvecloud/lyveapi"
 	"github.com/steinfletcher/apitest"
-	"github.com/szaydel/lyvecloud/lyveapi"
 )
 
 func TestUsage(t *testing.T) {

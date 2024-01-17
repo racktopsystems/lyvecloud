@@ -1,4 +1,4 @@
-module github.com/szaydel/lyvecloud
+module github.com/racktopsystems/lyvecloud
 
 go 1.20
 

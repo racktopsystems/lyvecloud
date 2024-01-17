@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/racktopsystems/lyvecloud/lyveapi"
 	"github.com/steinfletcher/apitest"
-	"github.com/szaydel/lyvecloud/lyveapi"
 )
 
 func TestToken(t *testing.T) {

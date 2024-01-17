@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/racktopsystems/lyvecloud/lyveapi"
 	"github.com/steinfletcher/apitest"
-	"github.com/szaydel/lyvecloud/lyveapi"
 )
 
 const mockSvcAcctUpdateAcctId = "037c16bc-1409-4997-a8d7-523b985e32d9"

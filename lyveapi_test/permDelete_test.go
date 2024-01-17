@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/racktopsystems/lyvecloud/lyveapi"
 	"github.com/steinfletcher/apitest"
-	"github.com/szaydel/lyvecloud/lyveapi"
 )
 
 func TestPermissionsDelete(t *testing.T) {
